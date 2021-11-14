@@ -1,0 +1,153 @@
+### Авторизация
+
+    Actor: Account
+    Command: Login to apps
+    Data: AccountAuthInfo
+    Event: Account.Logined
+
+### Таск-трекер
+
+  4. Новые таски может создавать кто угодно (администратор, начальник, разработчик, менеджер и любая другая роль). У задачи должны быть описание, статус (выполнена или нет) и попуг, на которого заассайнена задача.
+
+    Actor: Account
+    Command: Create Task
+    Data: Task + developer_id
+    Event: Tasks.Created
+
+  5. Менеджеры или администраторы должны иметь кнопку «заассайнить задачи», которая возьмёт все открытые задачи и рандомно заассайнит каждую на любого из сотрудников (**Update:** кроме менеджера и администратора) . Не успел закрыть задачу до реассайна — сорян, делай следующую.
+
+    Actor: Manager/Admin
+    Command: Reassign Tasks
+    Data: _/Tasks (?)
+    Event: Tasks.Reasssigned
+
+    3. При нажатии кнопки «заассайнить задачи» все текущие не закрытые задачи должны быть случайным образом перетасованы между каждым аккаунтом в системе
+  6. Каждый сотрудник должен иметь возможность отметить задачу выполненной.
+
+    Actor: Developer
+    Command: Resolve Task
+    Data: Task (?)
+    Event: Tasks.Resolved
+
+### Аккаунтинг: кто сколько денег заработал
+
+  3. У каждого из сотрудников должен быть свой счёт, который показывает, сколько за сегодня он получил денег. У счёта должен быть аудитлог того, за что были списаны или начислены деньги, с подробным описанием каждой из задач.
+  4. Расценки
+    - цены на задачу определяется единоразово, в момент появления в системе (можно с минимальной задержкой)
+      # (Где находится цена задачи, тут или в таск-трекере?)
+      Actor: Tasks.Created
+      Command: Set Price (?)
+      Data: task_id?
+      Event: Price.Set
+
+      Actor: Tasks.Created
+      Command: Set Fee (?)
+      Data: task_id?
+      Event: Fee.Set
+
+      - **Updated:** формула, которая говорит сколько списать денег с сотрудника при ассайне задачи — `rand(-10..-20)$`
+
+      Actor: Tasks.Reasssigned
+      Command: Write-off Money
+      Data: wallet_id, Task/Fee?
+      Event: Money.Writed-off
+
+      Actor: Money.Writed-off
+      Command: Log Write-off
+      Data: Price + wallet_id + Task?
+      Event: AuditLog.Write-offLogged
+
+    - **Updated:** формула, которая говорит сколько начислить денег сотруднику для выполненой задачи — `rand(20..40)$`
+
+      Actor: Tasks.Resolved
+      Command: Charge Money
+      Data: wallet_id, Task?
+      Event: Money.Charged
+
+      Actor: Money.Charged
+      Command: Log Charge
+      Data: Price + wallet_id + Task?
+      Event: AuditLog.ChargedLogged
+
+    - деньги списываются сразу после ассайна на сотрудника, а начисляются после выполнения задачи.
+  6. В конце дня необходимо
+
+    a. считать сколько денег сотрудник получил за рабочий день
+
+    Actor: Cron
+    Command: Payout # что в этой команде? На внешнюю систему?
+    Data: _/Wallets?
+    Event: Money.Paid
+
+    7. После выплаты баланса (в конце дня) он должен обнуляться, и в аудитлоге всех операций аккаунтинга должно быть отображено, что была выплачена сумма.
+      - отрицательный баланс переносится на следующий день. Единственный способ его погасить - закрыть достаточное количество задач в течении дня.
+
+    Actor: Money.Paid
+    Command: Clear Wallet # только для положительных балансов
+    Data: wallet_id(s)? # сколько ивентов?
+    Event: Wallet.Cleared
+
+    Actor: Wallet.Cleared # можно инициировать и Money.Paid - в чем разница? Оставил так, так как все-таки аудит привязан к кошельку.
+    Command: Log Paiment
+    Data: Amount + wallet_id?
+    Event: AuditLog.PaymentLogged
+
+    # Вызывается ли в Payout непосредственно переводы или там просто подсчет и уже внешний сервис ждет команды,
+    # т.е. инициируется Money.Paid?
+
+    b. отправлять на почту сумму выплаты.
+
+    Actor: Money.Paid
+    Command: Send email(s?)
+    Data: Amount + Developer(.email)? # один или все?
+    Event: Email.PaymentInfoSent
+
+Дополнительно (?):
+  # Не уверен, что это надо, но если не отображать логику подсчетов - не выделяется сервис аналитики - (?)
+  # Это рид модели?
+
+  ### Аккаунтинг: кто сколько денег заработал
+  5. Дешборд должен выводить количество заработанных топ-менеджментом за сегодня денег.
+
+  Actor: Manager/Admin
+  Command: Show Income
+  Data: [AuditLog]
+  Event: _
+
+  ### Аналитика
+
+  2. Нужно указывать, сколько заработал топ-менеджмент за сегодня и сколько попугов ушло в минус.
+
+    Actor: Admin
+    Command: Show Income
+    Data: [AuditLog]
+    Event: _
+
+  3. Нужно показывать самую дорогую задачу за день, неделю или месяц.
+
+    Actor: Admin
+    Command: Show the most expensive task
+    Data: [Task]
+    Event: _
+
+Цепочки:
+  Account:
+    Account.Logined
+    Tasks.Created -> Price.Set
+                  -> Fee.Set
+  Manager/Admin:
+    Tasks.Reassigned -> Money.Writed-off -> AuditLog.Write-offLogged
+    (Command) Show Income
+  Developer:
+    Tasks.Resolved -> Money.Charged -> AuditLog.ChargedLogged
+  Cron:
+    Money.Paid -> Wallet.Cleared -> AuditLog.PaymentLogged
+               -> Email.PaymentInfoSent
+  Admin:
+    (Command) Show Income
+    (Command) Show the most expensive task
+
+  # Возможно, привязываться в цепочках не на бизнес-ивент круда тасок, а на CUD-события?
+  # Tasks.Created -> CUDTaskCreated -> | Price.Set
+  # Бизнес в сервисе тасок просто обновит свою базу, а уже база пошлет CUD в сервис Аккаунтинга.
+  # Бизнесу не нужно даже генерить доменный ивент на шину - подумать, есть ли профит?
