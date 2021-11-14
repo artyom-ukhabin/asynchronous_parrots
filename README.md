@@ -1,10 +1,10 @@
 # EventStorming-команды
 Смотри соответсвующий .yml файл.
 
-Цепочки:  
+Цепочки:
   - Account:  
-    - Account.Logined  
-    - Tasks.Created -> Price.Set  
+    - Account.Logined
+    - Tasks.Created -> Price.Set
       Tasks.Created   -> Fee.Set
   - Manager/Admin:
     - Tasks.Reassigned -> Money.Writed-off -> AuditLog.Write-offLogged
