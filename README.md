@@ -23,11 +23,3 @@
 
 # Сервисы
 ![Alt text](design/schemes/Services.png)
-
-
-
-
-
-
-
-
