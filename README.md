@@ -19,7 +19,7 @@
     - (Command) Show the most expensive task
 
 # Домены
-![Alt text](design/schemes/Data Model.png)
+![Alt text](design/schemes/Data_Model.png)
 
 # Сервисы
 ![Alt text](design/schemes/Services.png)
