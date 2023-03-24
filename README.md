@@ -1,25 +1,25 @@
-# EventStorming-команды
-Смотри соответсвующий .yml файл.
+# EventStorming
+Смотри соответсвующий .yml файл для обзора команд.
 
 Цепочки:
-  - Account:  
-    - Account.Logined
-    - Tasks.Created -> Price.Set
-      Tasks.Created   -> Fee.Set
-  - Manager/Admin:
-    - Tasks.Reassigned -> Money.Writed-off -> AuditLog.Write-offLogged
-    - (Command) Show Income
-  - Developer:
-    - Tasks.Resolved -> Money.Charged -> AuditLog.ChargedLogged
-  - Cron:
-    - Money.Paid -> Wallet.Cleared -> AuditLog.PaymentLogged  
-      Money.Paid          -> Email.PaymentInfoSent
-  - Admin:
-    - (Command) Show Income
-    - (Command) Show the most expensive task
+  Log in (?)
+  Register Account
+  Change Account Role
+  Add Task              -> Assign Task -> Register debit Transaction
+  Change Task Assigners -> Assign Task -> Register debit Transaction
+  Resolve Task -> Register credit Transaction
+  Close Billing Cycles -> Send email
+                       -> Make Payment
+CUD-привязки:
+  Tasks.Created -> Set Prices
+  Transaction(Work).Created -> Update Balance (?)
+                            -> Update Managers Income (?)
+Read models:
+  Count Debited Accounts
+  Count the most Expensive Task
 
-# Домены
+# Модель данных + домены
 ![Alt text](design/schemes/Data_Model.png)
 
-# Сервисы
+# Сервисы + коммуникации
 ![Alt text](design/schemes/Services.png)
