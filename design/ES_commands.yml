@@ -1,16 +1,31 @@
   2. Авторизация в таск-трекере должна выполняться через общий сервис авторизации UberPopug Inc
 
+    Actor: Admin
+    Command: Register Account
+    Data: AccountInfo, Role
+    Event: Account.Registered
+
     Actor: Account
     Command: Log in
     Data: AccountAuthInfo (+ Token?)
     Event: Account.Logined
 
+    Actor: Admin
+    Command: Change Role
+    Data: Account Id, Role
+    Event: Account.RoleChanged
+
   4. Новые таски может создавать кто угодно (администратор, начальник, разработчик, менеджер и любая другая роль). У задачи должны быть описание, статус (выполнена или нет) и попуг, на которого заассайнена задача.
 
     Actor: Account
-    Command: Create Task
-    Data: Task (desc, status, account_id)
-    Event: Tasks.Created
+    Command: Add Task
+    Data: Task desc
+    Event: Task.Added
+
+    Actor: Account
+    Command: Assign Task
+    Data: Task id, Account Id
+    Event: Task.Assigned
 
   5. Менеджеры или администраторы должны иметь кнопку «заассайнить задачи», которая возьмёт все открытые задачи и рандомно заассайнит каждую на любого из сотрудников (**Update:** кроме менеджера и администратора) . Не успел закрыть задачу до реассайна — сорян, делай следующую.
     1. Ассайнить задачу можно на кого угодно (**Update:** кроме менеджера и администратора), это может быть любой существующий аккаунт из системы.
@@ -19,42 +34,31 @@
     4. Мы не заморачиваемся на ограничение по нажатию на кнопку «заассайнить задачи». Её можно нажимать хоть каждую секунду.
     5. На одного сотрудника может выпасть любое количество новых задач, может выпасть ноль, а может и 10.
     Actor: Manager/Admin
-    Command: Reassign Task(s)
-    Data: [Task id + account_id]
-    Event: [Task.Reassigned] (&&/|| Tasks.Reassigned)
+    Command: Change Task Assigners
+    Data: [Tasks], [Task id + account_id]
+    Event: [Task.AssignerChanged]
+
+    Actor: Task.AssignerChanged -> Command: Assign Task (см. ранее)
 
   6. Каждый сотрудник должен иметь возможность отметить задачу выполненной.
 
     Actor: Account
     Command: Resolve Task
     Data: Task id
-    Event: Tasks.Resolved
+    Event: Task.Resolved
 
   3. У каждого из сотрудников должен быть свой счёт, который показывает, сколько за сегодня он получил денег. У счёта должен быть аудитлог того, за что были списаны или начислены деньги, с подробным описанием каждой из задач.
+  4. Деньги списываются сразу после ассайна на сотрудника, а начисляются после выполнения задачи.
 
-    Actor: Purse.debited || Purse.credited
-    Command: Log Purse change
-    Data: Task description, Price, Purse id, Account Audit log
-    Event: AccountAuditlog.added
-
-  4. Расценки
-    - цены на задачу определяется единоразово, в момент появления в системе (можно с минимальной задержкой)
-      Actor: Tasks.Created
-      Command: Set Price
-      Data: Task id, AssignedPrice, ResolvedPrice
-      Event: Price.Set
-
-    - деньги списываются сразу после ассайна на сотрудника, а начисляются после выполнения задачи.
-
-      Actor: Tasks.Reasssigned
-      Command: Debit
-      Data: AssignedPrice, Account Purse id
-      Event: Purse.debited
+      Actor: Tasks.Asssigned
+      Command: Register debit Transaction
+      Data: Task description, AssignedPrice, Account id, Work Transaction
+      Event: Transaction.DebitRegistered
 
       Actor: Tasks.Resolved
-      Command: Credit
-      Data: ResolvedPrice, Account Purse id
-      Event: Purse.credited
+      Command: Register credit Transaction
+      Data: Task description, ResolvedPrice, Account id, Work Transaction
+      Event: Transaction.CreditRegistered
     
   6. В конце дня необходимо
     a. считать сколько денег сотрудник получил за рабочий день
@@ -63,36 +67,69 @@
 
     b. отправлять на почту сумму выплаты.    
       
-      Actor: Purse.cleared
+      Actor: BillingCycle.Closed
       Command: Send email
-      Data: Purse id, Account email
+      Data: Account email, Payment Transaction/Sum
       Event: IncomeEmail.sent
 
   7. После выплаты баланса (в конце дня) он должен обнуляться, и в аудитлоге всех операций аккаунтинга должно быть отображено, что была выплачена сумма. (Не работает на отрицательный баланс)
 
     Actor: Cron
-    Command: Clear Purse
-    Data: [Purse ids, Sum]
-    Event: [Purse.cleared]
+    Command: Close Billing Cycles
+    Data: [Account id], [Payment Transaction]
+    Event: [BillingCycle.Closed]
 
-    Actor: Purse.cleared
-    Command: Log account credit
-    Data: Sum, Account id
-    Event: GlobalAuditlog.added
+    Actor: BillingCycle.Closed
+    Command: Make Payment
+    Data: Account payment info, Payment Transaction/Sum
+    Event: Payment.Made
 
-  1. У админов и бухгалтеров должен быть доступ к общей статистике по деньгами заработанным (количество заработанных топ-менеджментом за сегодня денег + статистика по дням).
+Цепочки:
 
-    Actor: AccountAuditlog.added
-    Command: Update Managers Income
-    Data: Price, DayIncome
-    Event: ManagersIncome.Counted
+Log in (?)
+Register Account
+Change Account Role
+Add Task              -> Assign Task -> Register debit Transaction
+Change Task Assigners -> Assign Task -> Register debit Transaction
+Resolve Task -> Register credit Transaction
+Close Billing Cycles -> Send email
+                     -> Make Payment
+
+---------------------------------------
+
+Вспомогательные команды (на CUD):
+
+4. Расценки:
+    - цены на задачу определяется единоразово, в момент появления в системе (можно с минимальной задержкой)
+
+      Actor: Tasks.Created
+      Command: Set Prices
+      Data: Task id, AssignedPrice, ResolvedPrice
+      Event: -
+
+3. У каждого из сотрудников должен быть свой счёт, который показывает, сколько за сегодня он получил денег.
+
+   Actor: Transaction(Work).Created
+   Command: Update Balance
+   Data: Transaction, Balance
+   Event: -
+
+
+1. У админов и бухгалтеров должен быть доступ к общей статистике по деньгами заработанным (количество заработанных топ-менеджментом за сегодня денег + статистика по дням).
+
+   Actor: Transaction(Work).Created
+   Command: Update Managers Income
+   Data: WorkTransaction, DayIncome
+   Event: -
+
+Read Models:
 
   2. Нужно указывать, сколько заработал топ-менеджмент за сегодня и сколько попугов ушло в минус.
 
     Actor: Admin
     Command: Count Debited Accounts
-    Data: [Account Log]
-    Event: Accounts.DebitedFound
+    Data: [WorkTransaction], Accounts count
+    Event: -
 
   3. Нужно показывать самую дорогую задачу за день, неделю или месяц.
     a. самой дорогой задачей является задача с наивысшей ценой из списка всех закрытых задач за определенный период времени
@@ -100,15 +137,12 @@
       Actor: Admin
       Command: Count the most Expensive Task
       Data: [ResolvedPrice], Period, Task
-      Event: Tasks.ExpensiveFound
+      Event: -
 
 Цепочки:
 
-Log in
-Create Task -> Set Price
-Reassign Task -> Debit -> Log Purse change -> Update Managers Income
-Resolve Task -> Credit -> Log Purse change -> Update Managers Income
-Clear Purse -> Send email
-            -> Log account credit
+Tasks.Created -> Set Prices
+Transaction(Work).Created -> Update Balance (?)
+                          -> Update Managers Income (?)
 Count Debited Accounts
 Count the most Expensive Task

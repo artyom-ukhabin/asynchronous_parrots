@@ -2,12 +2,19 @@
 Смотри соответсвующий .yml файл для обзора команд.
 
 Цепочки:
-  Log in
-  Create Task -> Set Price
-  Reassign Task -> Debit -> Log Purse change -> Update Managers Income
-  Resolve Task -> Credit -> Log Purse change -> Update Managers Income
-  Clear Purse -> Send email
-              -> Log account credit
+  Log in (?)
+  Register Account
+  Change Account Role
+  Add Task              -> Assign Task -> Register debit Transaction
+  Change Task Assigners -> Assign Task -> Register debit Transaction
+  Resolve Task -> Register credit Transaction
+  Close Billing Cycles -> Send email
+                       -> Make Payment
+CUD-привязки:
+  Tasks.Created -> Set Prices
+  Transaction(Work).Created -> Update Balance (?)
+                            -> Update Managers Income (?)
+Read models:
   Count Debited Accounts
   Count the most Expensive Task
 
